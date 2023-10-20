@@ -1,16 +1,30 @@
 # dac_technologies
 
-A new Flutter project.
+DACTEST
 
-## Getting Started
+Applis pour afficher les utilisateurs depuis un api et ceux enregistrer depuis sqflite
 
-This project is a starting point for a Flutter application.
+Prérequis
+Flutter
+Dart
+Android Studio
 
-A few resources to get you started if this is your first Flutter project:
+Installation
+1- Clonez ce depot github sur votre ordinateur 
+git clone https://github.com/esklab/dactest.git
+2-Accédez au répertoire de l'application :
+cd le depot
+3-Exécutez la commande suivante pour obtenir les dépendances :
+flutter pub get
 
-- [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
+Utilisation
+Quand on lance l'applis une page avec une liste dutilsateur s affiche en card 
+Si vous voulez supprimer vous pouvez deplacer le card sur un coté
+Avec le bouton plus(+) vous pouvez ajouter un utilisateur 
+en cliquant sur une card  vous avez plus de details sur le profil indexer
+sur cette page vous trouverai un bouton modifier et supprimer en haut de la page 
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+Ressenti et temps mi 
+Au debut jai pas vraiment compris ce que je devait faire avec l'api apres jai vu les donner de l'api 
+et je me suis rendu compte que c'etait des informations sur des utilisateurs apres jai essayer d'imaginer comment les afficher 
+et comment l'applis allais etre structurer
