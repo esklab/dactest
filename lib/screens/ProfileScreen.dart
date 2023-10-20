@@ -1,22 +1,20 @@
 import 'package:dac_technologies/screens/HomeScreen.dart';
 import 'package:flutter/material.dart';
-import 'package:path/path.dart';
+import '../controller/userController.dart';
+import '../models/userModel.dart';
 
 class ProfileScreen extends StatefulWidget {
-  final Map<String, dynamic> userData;
+  final User userData;
   const ProfileScreen({Key? key, required this.userData}) : super(key: key);
-
   @override
-  _ProfileScreenState createState() => _ProfileScreenState();
+  ProfileScreenState createState() => ProfileScreenState();
 }
 
-class _ProfileScreenState extends State<ProfileScreen> {
-  final Map<String, dynamic> editedUserData = {};
-
+class ProfileScreenState extends State<ProfileScreen> {
+  bool showAdditionalButtons = false;
   @override
   void initState() {
     super.initState();
-    editedUserData.addAll(widget.userData);
   }
 
   @override
@@ -30,26 +28,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ),
         ),
         backgroundColor: Colors.black,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.edit, size: 26, color: Colors.white),
-            onPressed: () {
-              _editProfile(context);
-            },
-          ),
-          IconButton(
-            icon: const Icon(Icons.delete_forever, size: 26, color: Colors.white),
-            onPressed: () {
-              _deleteProfile(context);
-            },
-          ),
-        ],
       ),
       body: SingleChildScrollView(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _buildBackgroundImage(),
+            _buildBackgroundImage(context),
             _buildProfileInfo(),
           ],
         ),
@@ -57,13 +41,73 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  Widget _buildBackgroundImage() {
+  Widget _buildBackgroundImage(context) {
+    return Stack(
+      children: [
+        Container(
+          height: 380,
+          decoration: BoxDecoration(
+            image: DecorationImage(
+              image: NetworkImage(widget.userData.picture),
+              fit: BoxFit.cover,
+            ),
+          ),
+        ),
+        Positioned(
+          bottom: 16,
+          right: 14,
+          child: Column(
+            children: [
+              if (showAdditionalButtons)
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    _buildActionButton(const Icon(Icons.edit, color: Colors.white), () {
+                      _editProfile(context);
+                    }),
+                    const SizedBox(width: 20),
+                    _buildActionButton(const Icon(Icons.delete, color: Colors.white), () {
+                      _deleteProfile(context);
+                    }),
+                  ],
+                ),
+              _buildActionButton(
+                showAdditionalButtons ? const Icon(Icons.close, color: Colors.white) : const Icon(Icons.add, color: Colors.white),
+                    () {
+                  setState(() {
+                    showAdditionalButtons = !showAdditionalButtons;
+                  });
+                },
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildActionButton(Widget icon, Function() onPressed) {
     return Container(
-      height: 380,
+      width: 64,
+      height: 64,
       decoration: BoxDecoration(
-        image: DecorationImage(
-          image: NetworkImage(widget.userData['picture']['large'] ?? ''),
-          fit: BoxFit.cover,
+        shape: BoxShape.circle,
+        color: Colors.black,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.3),
+            spreadRadius: 1,
+            blurRadius: 5,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onPressed,
+          customBorder: const CircleBorder(),
+          child: Center(child: icon),
         ),
       ),
     );
@@ -76,14 +120,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
       margin: const EdgeInsets.all(14),
       child: Column(
         children: [
-          _buildInfoRow(Icons.person_2_outlined, 'Pseudo', widget.userData['login']['username']),
-          _buildInfoRow(Icons.person, 'Prénom', widget.userData['name']['first']),
-          _buildInfoRow(Icons.person, 'Nom', widget.userData['name']['last']),
-          _buildInfoRow(Icons.email, 'Email', widget.userData['email']),
-          _buildInfoRow(Icons.phone, 'Téléphone', widget.userData['phone']),
-          _buildInfoRow(Icons.location_on, 'Addresse', '${widget.userData['location']['street']['name']} ${widget.userData['location']['street']['name']} '),
-          _buildInfoRow(Icons.location_city, 'Pays','${widget.userData['location']['city']} ${widget.userData['location']['state']} ${widget.userData['location']['country']}'),
-          _buildInfoRow(Icons.local_post_office_sharp, 'Code Postal', '${widget.userData['location']['postcode']}'),
+          _buildInfoRow(Icons.person_2_outlined, 'Pseudo', widget.userData.username),
+          _buildInfoRow(Icons.person, 'Prénom', widget.userData.firstName),
+          _buildInfoRow(Icons.person, 'Nom', widget.userData.lastName),
+          _buildInfoRow(Icons.email, 'Email', widget.userData.email),
+          _buildInfoRow(Icons.phone, 'Telephone', widget.userData.phone),
+          _buildInfoRow(Icons.location_city, 'Ville', widget.userData.city),
+          _buildInfoRow(Icons.location_on, 'Pays',widget.userData.country),
+          _buildInfoRow(Icons.local_post_office_sharp, 'Code Postal', widget.userData.postcode),
+          _buildInfoRow(Icons.link, 'Image Url', widget.userData.picture),
         ],
       ),
     );
@@ -126,35 +171,80 @@ class _ProfileScreenState extends State<ProfileScreen> {
       context: context,
       builder: (context) {
         return AlertDialog(
-          title: Text("Éditer le profil"),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              _buildEditField("Pseudo", "login", "username"),
-              _buildEditField("Prénom", "name", "first"),
-              _buildEditField("Nom", "name", "last"),
-              _buildEditField("Email", "email", null),
-              _buildEditField("Téléphone", "phone", null),
-              _buildEditField("Adresse", "location", "street['name']"),
-              _buildEditField("Pays", "location", "country"),
-            ],
+          title: const Text("Éditer le profil"),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _buildEditField("Pseudo", widget.userData.username, (value) {
+                  setState(() {
+                    widget.userData.username = value;
+                  });
+                }),
+                _buildEditField("Prénom", widget.userData.firstName, (value) {
+                  setState(() {
+                    widget.userData.firstName = value;
+                  });
+                }),
+                _buildEditField("Nom", widget.userData.lastName, (value) {
+                  setState(() {
+                    widget.userData.lastName = value;
+                  });
+                }),
+                _buildEditField("Email", widget.userData.email, (value) {
+                  setState(() {
+                    widget.userData.email = value;
+                  });
+                }),
+                _buildEditField("Telephone", widget.userData.phone, (value) {
+                  setState(() {
+                    widget.userData.phone = value;
+                  });
+                }),
+                _buildEditField("Ville", widget.userData.city, (value) {
+                  setState(() {
+                    widget.userData.city = value;
+                  });
+                }),
+                _buildEditField("Pays", widget.userData.country, (value) {
+                  setState(() {
+                    widget.userData.country = value;
+                  });
+                }),
+                _buildEditField("Code Postal", widget.userData.postcode, (value) {
+                  setState(() {
+                    widget.userData.postcode = value;
+                  });
+                }),
+                _buildEditField("Image Url", widget.userData.picture, (value) {
+                  setState(() {
+                    widget.userData.picture = value;
+                  });
+                }),
+              ],
+            ),
           ),
           actions: <Widget>[
             TextButton(
               onPressed: () {
                 Navigator.of(context).pop();
               },
-              child: Text("Annuler"),
+              child: const Text("Annuler"),
             ),
             TextButton(
               onPressed: () {
-                setState(() {
-                  widget.userData.clear();
-                  widget.userData.addAll(editedUserData);
-                });
                 Navigator.of(context).pop();
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    backgroundColor: Colors.green,
+                    content: Text(
+                      'Modifier avec succès.',
+                      style: TextStyle(color: Colors.white),
+                    ),
+                  ),
+                );
               },
-              child: Text("Enregistrer"),
+              child: const Text("Enregistrer"),
             ),
           ],
         );
@@ -162,19 +252,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  Widget _buildEditField(String label, String category, String? field) {
+  Widget _buildEditField(String label, String initialValue, Function(String) onChanged) {
     return TextFormField(
       decoration: InputDecoration(labelText: label),
-      initialValue: field != null ? editedUserData[category][field] : editedUserData[category],
-      onChanged: (value) {
-        setState(() {
-          if (field != null) {
-            editedUserData[category][field] = value;
-          } else {
-            editedUserData[category] = value;
-          }
-        });
-      },
+      initialValue: initialValue,
+      onChanged: onChanged,
     );
   }
 
@@ -183,18 +265,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
       context: context,
       builder: (context) {
         return AlertDialog(
-          title: Text("Confirmation de la suppression"),
-          content: Text("Êtes-vous sûr de vouloir supprimer ce profil ?"),
+          title: const Text("Confirmation de la suppression"),
+          content: const Text("Êtes-vous sûr de vouloir supprimer ce profil ?"),
           actions: <Widget>[
             TextButton(
               onPressed: () {
                 Navigator.of(context).pop();
               },
-              child: Text("Annuler"),
+              child: const Text("Annuler"),
             ),
             TextButton(
               onPressed: () {
-                // Supprimez le profil ici
                 Navigator.of(context).pop();
                 _performDelete();
                 Navigator.of(context).pushReplacement(
@@ -203,7 +284,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   ),
                 );
               },
-              child: Text("Confirmer"),
+              child: const Text("Confirmer"),
             ),
           ],
         );
@@ -214,7 +295,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   void _performDelete() {
     // supprimer profil
     setState(() {
-      widget.userData.clear();
+      widget.userData.reset();
     });
   }
 }

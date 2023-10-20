@@ -25,7 +25,7 @@ class DatabaseHelper {
     return await openDatabase(path, version: 1, onCreate: (Database db, int newVersion) async {
       await db.execute('''
           CREATE TABLE profiles (
-            id INTEGER PRIMARY KEY,
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
             username TEXT,
             firstName TEXT,
             lastName TEXT,

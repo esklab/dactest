@@ -1,7 +1,9 @@
 import 'dart:convert';
+import 'package:dac_technologies/controller/userController.dart';
 import 'package:dac_technologies/screens/ProfileScreen.dart';
+import 'package:dac_technologies/services/api_services.dart';
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
+import '../models/userModel.dart';
 import '../services/database_helper.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -11,31 +13,26 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  List<Map<String, dynamic>> userData = [];
-  List<Map<String, dynamic>> filteredUserData = [];
-  static const apiUrl = "https://randomuser.me/api/";
+  List<User> userData = [];
+  List<User> filteredUserData = [];
+  final RandomUser randomUser = RandomUser();
+  final UserController userController =UserController();
+
+  @override
+  void initState() {
+    super.initState();
+    fetchUserData();
+  }
 
   Future<void> fetchUserData() async {
-    final response = await http.get(Uri.parse('$apiUrl?results=100'));
-    if (response.statusCode == 200) {
-      final data = json.decode(response.body);
-      final results = data['results'];
-      // Stockez les données de l'API dans SQLite
+    final List<User>? users = await randomUser.fetchUserData();
+    if (users != null) {
       final dbHelper = DatabaseHelper();
-      for (final user in results) {
-        await dbHelper.insertProfile({
-          'username': user['login']['username'],
-          'firstName': user['name']['first'],
-          'lastName': user['name']['last'],
-          'email': user['email'],
-          'phone': user['phone'],
-          'city': user['location']['city'],
-          'country': user['location']['country'],
-          'postcode': user['location']['postcode'],
-        });
+      for (final user in users) {
+        await dbHelper.insertProfile(user.toMap());
       }
       setState(() {
-        userData = results.cast<Map<String, dynamic>>();
+        userData = users;
         filteredUserData = List.from(userData);
       });
     }
@@ -45,15 +42,9 @@ class _HomeScreenState extends State<HomeScreen> {
     final dbHelper = DatabaseHelper();
     final profiles = await dbHelper.getProfiles();
     setState(() {
-      userData = profiles;
+      userData = profiles.cast<User>();
       filteredUserData = List.from(userData);
     });
-  }
-
-  @override
-  void initState() {
-    super.initState();
-    fetchUserData();
   }
 
   @override
@@ -61,10 +52,37 @@ class _HomeScreenState extends State<HomeScreen> {
     return Scaffold(
       backgroundColor: Colors.black,
       appBar: buildAppBar(),
-      body: Column(
+      body: Stack(
         children: [
-          buildSearchBar(),
-          Expanded(child: buildCard()
+          Column(
+            children: [
+              buildSearchBar(),
+              Expanded(child: buildCard()
+              ),
+            ],
+          ),
+          Positioned(
+            bottom: 18,
+            right: 18,
+            child: Container(
+              width: 62,
+              height: 62,
+              decoration: const BoxDecoration(
+                shape: BoxShape.circle,
+                color: Colors.black,
+              ),
+              child: Center(
+                child: IconButton(
+                  icon: const Icon(
+                    Icons.add,
+                    color: Colors.white,
+                  ),
+                  onPressed: () {
+                    _createProfile(context);
+                  },
+                ),
+              ),
+            ),
           ),
         ],
       ),
@@ -75,21 +93,13 @@ class _HomeScreenState extends State<HomeScreen> {
     return AppBar(
       backgroundColor: Colors.black54,
       title: const Text(
-        "DAC TEST",
+        "Dac test",
         style: TextStyle(
           fontSize: 26,
           color: Colors.white,
           fontWeight: FontWeight.bold,
         ),
       ),
-      actions: [
-        IconButton(
-          icon: Icon(Icons.add_circle_outline,size: 26,color: Colors.white,),
-          onPressed: () {
-            _createProfile(context);
-          },
-        ),
-      ],
     );
   }
 
@@ -121,7 +131,7 @@ class _HomeScreenState extends State<HomeScreen> {
     } else {
       setState(() {
         filteredUserData = userData.where((user) {
-          String fullName = '${user['name']['first']} ${user['name']['last']}';
+          String fullName = '${user.firstName} ${user.lastName}';
           return fullName.toLowerCase().contains(query.toLowerCase());
         }).toList();
       });
@@ -178,7 +188,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         topRight: Radius.circular(10.0),
                       ),
                       child: Image.network(
-                        userData[index]['picture']['large'] ?? '',
+                        userData[index].picture,
                         fit: BoxFit.cover,
                         height: 320,
                         width: double.infinity,
@@ -190,16 +200,16 @@ class _HomeScreenState extends State<HomeScreen> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            '${userData[index]['name']['first']} ${userData[index]['name']['last']}',
+                            '${userData[index].firstName} ${userData[index].lastName}',
                             style: const TextStyle(
                               fontSize: 20,
                               fontWeight: FontWeight.bold,
                               color: Colors.black,
                             ),
                           ),
-                          buildUserDetail('Email', userData[index]['email']),
-                          buildUserDetail('Phone', userData[index]['phone']),
-                          buildUserDetail('Location', userData[index]['location']['city']),
+                          buildUserDetail('Email', userData[index].email),
+                          buildUserDetail('Phone', userData[index].phone),
+                          buildUserDetail('Location', userData[index].city),
                         ],
                       ),
                     ),
@@ -212,6 +222,7 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
     );
   }
+
   Widget buildUserDetail(String title, String content) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
@@ -247,12 +258,13 @@ class _HomeScreenState extends State<HomeScreen> {
     final TextEditingController cityController = TextEditingController();
     final TextEditingController countryController = TextEditingController();
     final TextEditingController postcodeController = TextEditingController();
+    final TextEditingController pictureController = TextEditingController();
 
     showDialog(
       context: context,
       builder: (context) {
         return AlertDialog(
-          title: Text("Créer un profil"),
+          title: const Text("Créer un profil"),
           content: SingleChildScrollView(
             child: Column(
               mainAxisSize: MainAxisSize.min,
@@ -261,10 +273,11 @@ class _HomeScreenState extends State<HomeScreen> {
                 _buildCreateProfileField("Prénom", firstNameController),
                 _buildCreateProfileField("Nom", lastNameController),
                 _buildCreateProfileField("Email", emailController),
-                _buildCreateProfileField("Téléphone", phoneController),
+                _buildCreateProfileField("Telephone", phoneController),
                 _buildCreateProfileField("Ville", cityController),
                 _buildCreateProfileField("Pays", countryController),
                 _buildCreateProfileField("Code Postal", postcodeController),
+                _buildCreateProfileField("Picture", pictureController),
               ],
             ),
           ),
@@ -273,35 +286,53 @@ class _HomeScreenState extends State<HomeScreen> {
               onPressed: () {
                 Navigator.of(context).pop();
               },
-              child: Text("Annuler"),
+              child: const Text("Annuler"),
             ),
             TextButton(
               onPressed: () async {
-                // Créez un nouvel utilisateur avec les données saisies
-                final dbHelper = DatabaseHelper();
-                final newUser = {
-                  'login': {
-                    'username': pseudoController.text,
-                  },
-                  'name': {
-                    'first': firstNameController.text,
-                    'last': lastNameController.text,
-                  },
-                  'email': emailController.text,
-                  'phone': phoneController.text,
-                  'location': {
-                    'city': cityController.text,
-                    'country': countryController.text,
-                    'postcode': postcodeController.text,
-                  },
-                };
-                final id = await dbHelper.insertProfile(newUser);
-                newUser['id'] = id;
-                setState(() {
-                  userData.add(newUser);
-                  filteredUserData.add(newUser);
-                });
-                Navigator.of(context).pop();
+                if (userController.isInputValid(
+                    pseudoController.text,
+                    firstNameController.text,
+                    lastNameController.text,
+                    emailController.text,
+                    phoneController.text,
+                    cityController.text,
+                    countryController.text,
+                    postcodeController.text,
+                    pictureController.text)) {
+                  // Créez un nouvel utilisateur avec les données saisies
+                  final newUser = User(
+                    username: pseudoController.text,
+                    firstName: firstNameController.text,
+                    lastName: lastNameController.text,
+                    email: emailController.text,
+                    phone: phoneController.text,
+                    city: cityController.text,
+                    country: countryController.text,
+                    postcode: postcodeController.text,
+                    picture: pictureController.text,
+                  );
+                  setState(() {
+                    userData.add(newUser);
+                    filteredUserData.add(newUser);
+                  });
+                  Navigator.of(context).pop();
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      backgroundColor: Colors.green,
+                      content: Text('Enregistrement reussis.',
+                        style: TextStyle(color: Colors.white),),
+                    ),
+                  );
+                } else {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      backgroundColor: Colors.red,
+                      content: Text('Veuillez remplir tous les champs correctement.',
+                        style: TextStyle(color: Colors.white),),
+                    ),
+                  );
+                }
               },
               child: const Text("Créer"),
             ),
@@ -318,3 +349,6 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 }
+
+
+
